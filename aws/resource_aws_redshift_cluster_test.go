@@ -719,6 +719,42 @@ func testAccCheckAWSRedshiftClusterMasterUsername(c *redshift.Cluster, value str
 	}
 }
 
+func TestAccAWSRedshiftCluster_maintenance_track(t *testing.T) {
+	var v redshift.Cluster
+
+	ri := acctest.RandInt()
+	preConfig := testAccAWSRedshiftClusterConfig_maintenanceTrack(ri)
+	postConfig := testAccAWSRedshiftClusterConfig_updatedMaintenanceTrack(ri)
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		ErrorCheck:   testAccErrorCheck(t, redshift.EndpointsID),
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAWSRedshiftClusterDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: preConfig,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSRedshiftClusterExists("aws_redshift_cluster.default", &v),
+					resource.TestCheckResourceAttr(
+						"aws_redshift_cluster.default", "tags.%", "3"),
+					resource.TestCheckResourceAttr("aws_redshift_cluster.default", "tags.environment", "Production"),
+				),
+			},
+
+			{
+				Config: postConfig,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSRedshiftClusterExists("aws_redshift_cluster.default", &v),
+					resource.TestCheckResourceAttr(
+						"aws_redshift_cluster.default", "tags.%", "1"),
+					resource.TestCheckResourceAttr("aws_redshift_cluster.default", "tags.environment", "Production"),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckAWSRedshiftClusterNotRecreated(i, j *redshift.Cluster) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		// In lieu of some other uniquely identifying attribute from the API that always changes
@@ -1121,6 +1157,42 @@ resource "aws_redshift_cluster" "default" {
   tags = {
     environment = "Production"
   }
+}
+`, rInt))
+}
+
+func testAccAWSRedshiftClusterConfig_maintenanceTrack(rInt int) string {
+	return composeConfig(testAccAvailableAZsNoOptInConfig(), fmt.Sprintf(`
+resource "aws_redshift_cluster" "default" {
+  cluster_identifier                  = "tf-redshift-cluster-%d"
+  availability_zone                   = data.aws_availability_zones.available.names[0]
+  database_name                       = "mydb"
+  master_username                     = "foo"
+  master_password                     = "Mustbe8characters"
+  node_type                           = "dc1.large"
+  automated_snapshot_retention_period = 7
+  allow_version_upgrade               = false
+  skip_final_snapshot                 = true
+  maintenance_track_name              = "current"
+
+}
+`, rInt))
+}
+
+func testAccAWSRedshiftClusterConfig_updatedMaintenanceTrack(rInt int) string {
+	return composeConfig(testAccAvailableAZsNoOptInConfig(), fmt.Sprintf(`
+resource "aws_redshift_cluster" "default" {
+  cluster_identifier                  = "tf-redshift-cluster-%d"
+  availability_zone                   = data.aws_availability_zones.available.names[0]
+  database_name                       = "mydb"
+  master_username                     = "foo"
+  master_password                     = "Mustbe8characters"
+  node_type                           = "dc1.large"
+  automated_snapshot_retention_period = 7
+  allow_version_upgrade               = false
+  skip_final_snapshot                 = true
+  maintenance_track_name              = "trailing"
+
 }
 `, rInt))
 }
